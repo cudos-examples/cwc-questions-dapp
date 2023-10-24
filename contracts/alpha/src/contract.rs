@@ -1,28 +1,29 @@
 use cosmwasm_std::{
     entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
 };
+use cw2::set_contract_version;
 
 use crate::error::ContractError;
 use crate::msg::{QuestionResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{State, STATE};
+use crate::state::{STATE, Question};
+
+const CONTRACT_NAME: &str = "crates.io:cwc-questions-dapp";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    msg: InstantiateMsg,
+    _msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    let state = State {
-        // count: msg.count,
-        questions: msg.questions,
-        owner: info.sender,
-    };
-    STATE.save(deps.storage, &state)?;
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION);
 
-    Ok(Response::default())
+    Ok(Response::new()
+    .add_attribute("method", "instantiate")
+    .add_attribute("owner", info.sender))
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
@@ -34,15 +35,19 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::PostQuestion {} => try_post_question(deps, question),
-        ExecuteMsg::Reset { count } => try_reset(deps, info, count),
+        ExecuteMsg::PostQuestion { handle, question } => try_post_question(deps, question),
     }
 }
 
 pub fn try_post_question(deps: DepsMut, question: String) -> Result<Response, ContractError> {
-        STATE.save(deps.storage, &question);
+    
+    let question = Question {
+        question: question
+    };
 
-        Ok(Response::new().add_attribute("action", "post_question"))
+    STATE.save(deps.storage, &question);
+
+    Ok(Response::new().add_attribute("action", "post_question"))
 }
 
 #[entry_point]
@@ -54,7 +59,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 fn query_questions(deps: Deps) -> StdResult<QuestionResponse> {
     let state = STATE.load(deps.storage)?;
-    Ok(QuestionResponse { questions: state.questions })
+    Ok(QuestionResponse { questions: state.question })
 }
 
 // #[cfg(test)]
